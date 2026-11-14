@@ -175,3 +175,132 @@ CSDL phải có ràng buộc duy nhất cho mã hộ. Chỉ kiểm tra mã trùn
 | HH-CREATE-10 | Tạo thành công | Có nhật ký xác định đúng người thực hiện và hồ sơ được tạo |
 
 ---
+# 2. API CẬP NHẬT HỒ SƠ HỘ GIA ĐÌNH
+
+## 2.1. Mục đích và căn cứ yêu cầu
+
+API cho phép người dùng có quyền cập nhật thông tin của hồ sơ hộ gia đình đã tồn tại trong hệ thống.
+
+API đáp ứng chức năng cập nhật thuộc **US-04 – Quản lý hồ sơ hộ gia đình**, với các yêu cầu sau:
+
+- Giữ nguyên mã hộ gia đình.
+- Giữ nguyên liên kết giữa hộ gia đình và các thành viên.
+- Kiểm tra tính hợp lệ của các trường thông tin bắt buộc, trong đó diện tích phải lớn hơn `0`.
+- Không tự động thay đổi các khoản phải thu đã được lập trong những kỳ trước.
+- Thực hiện xác thực, kiểm tra quyền tại backend và ghi nhật ký thay đổi.
+
+## 2.2. Phương thức và đường dẫn
+
+```http
+PUT /api/households/{householdId}
+Content-Type: application/json
+```
+
+Trong đó, `householdId` là ID nội bộ của hồ sơ hộ gia đình cần cập nhật.
+
+Đây là API cập nhật đầy đủ các trường thông tin được phép chỉnh sửa. Frontend phải gửi đầy đủ các trường bắt buộc theo hợp đồng API đã thống nhất.
+
+## 2.3. Dữ liệu đầu vào
+
+**Request Body:**
+
+```json
+{
+  "apartmentCode": "A1201",
+  "headOfHouseholdName": "Nguyễn Văn An",
+  "contactPhone": "0912345678",
+  "area": 72.5
+}
+```
+
+**Quy định các trường dữ liệu:**
+
+| Trường | Kiểu dữ liệu | Bắt buộc | Quy tắc kiểm tra |
+|---|---|---|---|
+| `apartmentCode` | Chuỗi | Có | Không được để trống |
+| `headOfHouseholdName` | Chuỗi | Có | Không được để trống |
+| `contactPhone` | Chuỗi | Có | Không được để trống; kiểm tra định dạng theo quy tắc đã thống nhất |
+| `area` | Số thập phân | Có | Giá trị phải lớn hơn `0` |
+
+**Các ràng buộc nghiệp vụ:**
+
+- Không cho phép cập nhật các trường `id` và `householdCode`.
+- Nếu request chứa các trường không được phép chỉnh sửa, backend phải trả về lỗi `400 Bad Request` theo quy ước kiểm tra dữ liệu đầu vào.
+
+**Các vấn đề cần đối chiếu với ERD:**
+
+1. **Liên kết căn hộ:** Nếu căn hộ được thiết kế thành một thực thể riêng, sử dụng `apartmentId` thay cho `apartmentCode`. Backend phải kiểm tra căn hộ được tham chiếu có tồn tại hay không.
+2. **Liên kết chủ hộ:** Nếu chủ hộ được liên kết trực tiếp với hồ sơ cư dân, sử dụng `headResidentId` thay cho `headOfHouseholdName`. Backend phải kiểm tra người được chọn có thuộc hộ gia đình tương ứng hay không.
+3. **Tính nhất quán của hợp đồng API:** Không sử dụng đồng thời hai cách biểu diễn khác nhau cho cùng một quan hệ trong phiên bản API cuối cùng.
+
+## 2.4. Quy tắc xử lý
+
+1. Kiểm tra trạng thái đăng nhập, quyền cập nhật hồ sơ hộ gia đình và tính hợp lệ của CSRF token.
+2. Kiểm tra định dạng của tham số `householdId`.
+3. Kiểm tra sự tồn tại của hồ sơ hộ gia đình theo `householdId`.
+4. Kiểm tra và chuẩn hóa các trường dữ liệu đầu vào.
+5. Cập nhật các trường thông tin được phép chỉnh sửa.
+6. Giữ nguyên mã hộ gia đình và liên kết với các thành viên.
+7. Ghi nhật ký thay đổi, bao gồm người thực hiện, thời điểm, hồ sơ được cập nhật và nội dung thay đổi.
+8. Commit transaction và trả về thông tin hồ sơ sau khi cập nhật.
+
+**Lưu ý về nghiệp vụ:**
+
+Việc thay đổi diện tích chỉ cập nhật thông tin hồ sơ hộ gia đình. API này **không tự động tính lại hoặc ghi đè các khoản phải thu đã được lập**.
+
+Quy tắc sử dụng diện tích mới để tính toán khoản phải thu thuộc phạm vi thiết kế nghiệp vụ lập khoản phải thu.
+
+Ngoài ra, việc chỉnh sửa thông tin căn hộ hoặc chủ hộ không được tự động làm phát sinh nghiệp vụ chuyển đi, chuyển đến hoặc thay đổi thành viên hộ gia đình. Những thay đổi có ý nghĩa về cư trú cần được đối chiếu với thiết kế của **US-06 – Quản lý biến động cư trú**.
+
+## 2.5. Phản hồi thành công
+
+**HTTP Status:** `200 OK`
+
+**Response Body:**
+
+```json
+{
+  "id": 101,
+  "householdCode": "HO-001",
+  "apartmentCode": "A1201",
+  "headOfHouseholdName": "Nguyễn Văn An",
+  "contactPhone": "0912345678",
+  "area": 72.5
+}
+```
+
+## 2.6. Các trường hợp lỗi
+
+| HTTP Status | Mã lỗi | Mô tả |
+|---|---|---|
+| `400` | `VALIDATION_ERROR` | Dữ liệu đầu vào bị thiếu, diện tích không hợp lệ hoặc chứa trường không được phép cập nhật |
+| `401` | `UNAUTHENTICATED` | Phiên đăng nhập không hợp lệ hoặc đã hết hạn |
+| `403` | `FORBIDDEN` | Người dùng không có quyền cập nhật hồ sơ |
+| `403` | `CSRF_INVALID` | Kiểm tra CSRF không thành công |
+| `404` | `HOUSEHOLD_NOT_FOUND` | Không tìm thấy hồ sơ hộ gia đình theo ID |
+| `409` | `HOUSEHOLD_UPDATE_CONFLICT` | Thao tác cập nhật xung đột với quan hệ hoặc trạng thái nghiệp vụ đã được xác định |
+| `500` | `INTERNAL_ERROR` | Hệ thống gặp lỗi ngoài dự kiến |
+
+**Lưu ý:** Chỉ sử dụng mã lỗi `409 Conflict` khi đã xác định được quy tắc xung đột nghiệp vụ cụ thể. Không sử dụng mã lỗi này để thay thế các lỗi kiểm tra dữ liệu đầu vào thông thường.
+
+## 2.7. Quản lý transaction và tính toàn vẹn dữ liệu
+
+Các thao tác cập nhật hồ sơ hộ gia đình và ghi nhật ký thay đổi phải được thực hiện trong cùng một transaction nếu nhật ký được lưu trữ trong cùng cơ sở dữ liệu.
+
+Nếu bất kỳ thao tác nào thất bại, hệ thống phải rollback toàn bộ transaction để tránh tình trạng hồ sơ đã được cập nhật nhưng không có nhật ký tương ứng.
+
+Cơ chế này giúp bảo đảm tính toàn vẹn và nhất quán của dữ liệu trong quá trình cập nhật.
+
+## 2.8. Các tình huống kiểm thử
+
+| Trường hợp kiểm thử | Kết quả mong đợi |
+|---|---|
+| Dữ liệu cập nhật hợp lệ | Trả về `200 OK` và lưu dữ liệu chính xác |
+| Diện tích bằng `0` hoặc nhỏ hơn `0` | Trả về `400 Bad Request`, giữ nguyên dữ liệu cũ |
+| Thiếu trường thông tin bắt buộc | Trả về `400 Bad Request`, chỉ rõ trường bị lỗi |
+| Yêu cầu thay đổi mã hộ gia đình | Trả về `400 Bad Request` |
+| Hồ sơ hộ gia đình không tồn tại | Trả về `404 Not Found` |
+| Người dùng không có quyền cập nhật | Trả về `403 Forbidden`, không thay đổi dữ liệu |
+| Cập nhật hồ sơ thành công | Giữ nguyên mã hộ gia đình và liên kết với các thành viên |
+| Thay đổi diện tích hộ gia đình | Các khoản phải thu đã lập không bị thay đổi |
+| Thao tác ghi nhật ký thất bại | Rollback toàn bộ transaction cập nhật hồ sơ |
