@@ -1,0 +1,20 @@
+# macOS & IDE
+.DS_Store
+.idea/
+*.iml
+.vscode/
+
+# Java / Maven / Spring Boot
+backend/target/
+*.log
+
+# Cấu hình cá nhân chứa mật khẩu DB (không đẩy lên Git)
+**/application-local.properties
+**/application-local.yml
+.env
+.env.local
+
+# Node / React (chuẩn bị sẵn cho frontend)
+node_modules/
+frontend/dist/
+frontend/build/

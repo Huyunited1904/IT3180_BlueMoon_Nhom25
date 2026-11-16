@@ -1,0 +1,3 @@
+spring.datasource.url=jdbc:mysql://localhost:3306/bluemoon?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Ho_Chi_Minh&characterEncoding=UTF-8
+spring.datasource.username=bluemoon_user
+spring.datasource.password=THAY_MAT_KHAU_CUA_BAN
