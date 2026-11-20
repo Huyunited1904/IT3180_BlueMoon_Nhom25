@@ -1,0 +1,15 @@
+# Thư viện và sản phẩm build
+node_modules/
+dist/
+dist-ssr/
+
+# Cấu hình môi trường cá nhân (không đưa bí mật lên Git)
+.env
+.env.local
+.env.*.local
+
+# Nhật ký và tệp tạm
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
